@@ -11,13 +11,16 @@
 %
 % OUTPUT
 % cc_pd             - correlation coefficient for model performance
+% amp               - amplitude of each output at peak
+% phase             - delay of each output relative to target motion
 %
 % CREATED - 09/12/2022 MC and RW
 % UPDATED - 09/19/2022 MC removed weight variable, adjusted derivative amp
 %           09/20/2022 MC added delay calculation
+%           02/07/2023 MC added delay output
 %
 
-function [cc_pd] = controlsimulation(stimwave,funcFreq,controllerDelay,stimType,plotSim)
+function [cc_pd,amp,phase] = controlsimulation(stimwave,funcFreq,controllerDelay,stimType,plotSim)
 %% initialize
 disp('Starting control simulation...')
 % set time array
@@ -58,27 +61,34 @@ cc_pd = corrcoef(stimwave,cEC);
 
 %% find peaks to determine output phase relative to stimulus
 
+% initialize
+phase={};
+
 if stimType==1
     pdis = 300; %min peak distance
     phght = 1; %min peak height
-    [~,is] = findpeaks(stimwave,'MinPeakHeight',phght,'MinPeakDistance',pdis); %stimulus
-    [~,ip] = findpeaks(pEC,'MinPeakHeight',phght,'MinPeakDistance',pdis); %pos
-    [~,id] = findpeaks(dEC,'MinPeakHeight',phght,'MinPeakDistance',pdis); %der
-    [~,ic] = findpeaks(cEC,'MinPeakHeight',phght,'MinPeakDistance',pdis);
+    [~,idx_s] = findpeaks(stimwave,'MinPeakHeight',phght,'MinPeakDistance',pdis); %stimulus
+    [pk_p,idx_p] = findpeaks(pEC,'MinPeakHeight',phght,'MinPeakDistance',pdis); %pos
+    [pk_d,idx_d] = findpeaks(dEC,'MinPeakHeight',phght,'MinPeakDistance',pdis); %der
+    [pk_c,idx_c] = findpeaks(cEC,'MinPeakHeight',phght,'MinPeakDistance',pdis);
 
-    if length(ip)>1
-        % remove first/last, as these outputs are often distorted
-        is(1) = [];
-        ip(1) = [];
-        id([1 end])=[];
-        ic([1 end])=[];
-
-        pDelay = mean((t(ip) - t(is)))*1000;
-        dDelay = mean((t(id) - t(is)))*1000;
-        cDelay = mean((t(ic) - t(is)))*1000;
+    if length(idx_p)>1
+        % remove first/last peaks
+        idx_s = idx_s(2:end);
+        idx_p = idx_p(2:end);
+        idx_d = idx_d(2:end-1);
+        idx_c = idx_c(2:end-1);
+        % calculate mean phase lag between each output and the stimulus
+        phase.pos = mean((t(idx_p) - t(idx_s)))*1000;
+        phase.der = mean((t(idx_d) - t(idx_s)))*1000;
+        phase.combo = mean((t(idx_c) - t(idx_s)))*1000;
+        % calculate mean output magnitude for each output
+        amp.pos = mean(pk_p(2:end));
+        amp.der = mean(pk_d(2:end-1));
+        amp.combo = mean(pk_c(2:end-1));
     end
 else
-    ip = [];
+    idx_p = [];
 end
 
 
@@ -106,14 +116,14 @@ if plotSim
     plot(t,stimwave,'Color','k','LineWidth',lw)
     yline(0,'Color','#7E2F8E')
     % plot output peaks
-    if ~isempty(ip)
-        xline(t(is),'Color','k')
-        xline(t(ip),'Color','#D95319')
-        xline(t(id),'Color','#77AC30')
-        xline(t(ic),'Color','#0072BD')
+    if ~isempty(idx_p)
+        xline(t(idx_s),'Color','k')
+        xline(t(idx_p),'Color','#D95319')
+        xline(t(idx_d),'Color','#77AC30')
+        xline(t(idx_c),'Color','#0072BD')
 
         dim = [0.8 0.6 0.3 0.3];
-        str = {['P(delay) = ' num2str(pDelay)],['D(delay) = ' num2str(dDelay)],['PD(delay) = ' num2str(cDelay)]};
+        str = {['P(delay) = ' num2str(phase.pos)],['D(delay) = ' num2str(phase.der)],['PD(delay) = ' num2str(phase.combo)]};
         annotation('textbox',dim,'String',str,'FitBoxToText','on');
     end
     ylabel('Target Position (deg)');

@@ -4,7 +4,7 @@
 controllerDelay=200; %msec
 
 % set folder
-modelFolder = 'C:\Users\wilson\Dropbox (HMS)\MATLAB\Modeling';
+modelFolder = 'C:\Users\wilson\Dropbox (HMS)\MATLAB\Modeling_Code';
 
 %% simple sawtooth
 cd(modelFolder)
