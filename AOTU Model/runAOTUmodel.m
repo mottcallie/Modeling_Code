@@ -1,4 +1,4 @@
-% runAOTUmodel2
+% runAOTUmodel
 % main script for running many itterations of a simple AOTU
 % model while modifying basic parameters such as synapse weight, synapse
 % sign, noise, open-loop v closed-loop, etc.
@@ -32,8 +32,8 @@ rfOther(:,idxCB2070) = flip(rfOther(:,idxCB2070),1);
 % sum
 rfOther = sum(rfOther,2);
 % (optional) lightly smooth combined RF
-gwin = 15;
-rfOther = smoothdata(rfOther,"gaussian",gwin);
+%gwin = 15;
+%rfOther = smoothdata(rfOther,"gaussian",gwin);
 % generate RF lookup table for AOTU019, AOTU025, and the sum of all other NOIs
 rfAll = [rfOther Pursuit_RFs(:,ismember(celltypes,{'AOTU019','AOTU025'}))];
 
@@ -77,7 +77,7 @@ thisSyn = 'excitatory';
 simTime = 25;
 
 % run standard model
-[timebase,visobj_history,input_history,~] = aotu_steering_model2(rfAll,thisNoise,thisStart,thisSyn,simTime);
+[timebase,visobj_history,input_history,~] = aotu_steering_model(rfAll,thisNoise,thisStart,thisSyn,simTime);
 % determine current offset
 cur_offset = DNa02input(interp1(DNa02output,1:length(DNa02output),0.5,'nearest'));
 % determine if DN input/output needs to be offset
@@ -344,7 +344,7 @@ for y = 1:nSyn
 
         % run this simulation condition
         disp(join(["Simulating " thisStrength "x weight synapse condition..."],""))
-        [timebase,visobj_history,rotvel_history] = aotu_steering_oscmodel2(thisTuning,noiseLevel,thisSynapse,simTime);
+        [timebase,visobj_history,rotvel_history] = aotu_steering_oscmodel(thisTuning,noiseLevel,thisSynapse,simTime);
         disp("Simulation complete.")
 
         % generate condition plot
@@ -476,7 +476,7 @@ for r = 1:2
 
                 % run this simulation condition
                 disp(join(["Simulating " num2str(thisNoise) " noise condition..."],""))
-                [timebase,visobj_history,rotvel_history] = aotu_steering_model2(thisTuning,thisNoise,thisStart,thisSyn,simTime);
+                [timebase,visobj_history,rotvel_history] = aotu_steering_model(thisTuning,thisNoise,thisStart,thisSyn,simTime);
                 disp("Simulation complete.")
                 % estimate time to setpoint (0)
                 runCross(s,n,y) = median(timebase(findFirstZeroCrossingMultiple(visobj_history)));

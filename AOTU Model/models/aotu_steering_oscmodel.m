@@ -16,7 +16,7 @@
 % 06/25/24 - MC combine all RFs except 19/25
 %
 
-function [timebase,visobj_history,rotvel_history] = aotu_steering_oscmodel2(noiTuning,noiseLevel,AOTU019synapse,nTime)
+function [timebase,visobj_history,rotvel_history] = aotu_steering_oscmodel(noiTuning,noiseLevel,AOTU019synapse,nTime)
 %% initialize
 % load simulation variables
 model_settings

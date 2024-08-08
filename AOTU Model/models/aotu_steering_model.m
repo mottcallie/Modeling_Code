@@ -19,7 +19,7 @@
 % 07/01/24 - MC added input_history as output
 %
 
-function [timebase,visobj_history,input_history,rotvel_history] = aotu_steering_model2(...
+function [timebase,visobj_history,input_history,rotvel_history] = aotu_steering_model(...
     noiTuning,noiseLevel,startPos,AOTU019synapse,nTime)
 %% initialize
 % load simulation variables
@@ -74,9 +74,12 @@ for t=3:nTime
         case "excitatory"
             current_inputR = AOTU025R(p2) + AOTU019R(p1) + noiSumR(p2);
             current_inputL = AOTU025L(p2) + AOTU019L(p1) + noiSumL(p2);
-        case "slow"
+        case "slowinhibitory"
             current_inputR = AOTU025R(p2) - AOTU019L(p2) + noiSumR(p2);
             current_inputL = AOTU025L(p2) - AOTU019R(p2) + noiSumL(p2);
+        case "slowexcitatory"
+            current_inputR = AOTU025R(p2) + AOTU019R(p2) + noiSumR(p2);
+            current_inputL = AOTU025L(p2) + AOTU019L(p2) + noiSumL(p2);
     end
     % store input history
     input_history(:,t,1) = current_inputR; %right
