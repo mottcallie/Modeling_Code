@@ -11,27 +11,24 @@
 clear
 close all
 
+% fetch processing settings
+settings = processSettings();
+
 % set data folders
 thisFile = matlab.desktop.editor.getActiveFilename;
 thisFolder = extractBefore(thisFile,'\model_pursuit.m');
 plotFolder = [thisFolder '\plots'];
-pursuitFolder = "E:\AOTU019 Target Speed Battery\interpolated";
-darknssFolder = "E:\AOTU019 P1 Background\interpolated";
+pursuitFolder = "E:\AOTU019 Oscillate\interpolated";
+darknssFolder = "E:\AOTU019 Background P1\interpolated";
 
 % load file/fly names from pursuit data
 cd(pursuitFolder)
 pursuitFiles = dir('*int.mat');
-load('trackLR.mat')
-trackLR = flip(trackLR);
-vel_xcorr = readtable("xcorr_tbl.txt");
-obj_xcorr = readtable("xcorr2_tbl.txt");
+obj_xcorr.Obj = 0;
 
 for n = 1:length(pursuitFiles)
     flyNames{n,1} = extractBefore(pursuitFiles(n).name,'_int.mat');
 end
-% flips angular velocity if needed, such that IPSI is + and CONTRA is -
-normLRP = ones(1,length(trackLR));
-normLRP(trackLR=='L') = -1;
 
 % load corresponding background data
 cd(darknssFolder)
@@ -44,9 +41,6 @@ for n = length(darknssFiles):-1:1
         trackLR(n) = [];
     end
 end
-% flips angular velocity if needed, such that IPSI is + and CONTRA is -
-normLRD = ones(1,length(trackLR));
-normLRD(trackLR=='L') = -1;
 
 % set variables
 restThreshold = 1; %mm/s
@@ -97,9 +91,9 @@ for nf = 1:nFliesD
     spikert = dfD.int_spikert(:,:,1);
     % pull predictor data and lag shift
     t = dfD.int_time;
-    forward = lagShift(dfD.int_forward(:,:,1),t,vel_xcorr.Forward(speedSelect));
-    angular = lagShift(dfD.int_angular(:,:,1),t,vel_xcorr.Angular(speedSelect));
-    sideway = lagShift(dfD.int_sideway(:,:,1),t,vel_xcorr.Sideway(speedSelect));
+    forward = lagShift(dfD.int_forward(:,:,1),t,settings.fwdLag);
+    angular = lagShift(dfD.int_angular(:,:,1),t,settings.angLag);
+    sideway = lagShift(dfD.int_sideway(:,:,1),t,settings.sidLag);
 
     % omit rests
     forward(forward<0.25) = nan;
@@ -154,14 +148,14 @@ for nf = 1:nFliesD
         rest_spikert(~rest_idx) = nan;
         rest_spikert = reshape(rest_spikert,[],1);
         % pull predictor data and lag shift
-        panelps = lagShift(dfP.int_panelps(:,:,speedSelect),t,obj_xcorr.Obj(speedSelect));
+        panelps = lagShift(dfP.int_panelps(:,:,speedSelect),t,obj_xcorr.Obj);
         % and determine panel direction and reshape
         paneldr = panelDirection(panelps);
         panelps = reshape(panelps,[],1);
         paneldr = reshape(paneldr,[],1);
         % normalize direction and pull IPSI only
-        panelpsI = panelps .* normLRD(nf);
-        paneldrI = paneldr .* normLRD(nf);
+        panelpsI = panelps;
+        paneldrI = paneldr;
         paneldrI(panelpsI<0) = nan;
         panelpsI(panelpsI<0) = nan;
 
@@ -187,16 +181,14 @@ for nf = 1:nFliesD
         pur_spikert = reshape(pur_spikert,[],1);
         % pull predictor data and lag shift
         t = dfP.int_time;
-        forward = lagShift(dfP.int_forward(:,:,1),t,vel_xcorr.Forward(speedSelect));
-        angular = lagShift(dfP.int_angular(:,:,1),t,vel_xcorr.Angular(speedSelect));
-        sideway = lagShift(dfP.int_sideway(:,:,1),t,vel_xcorr.Sideway(speedSelect));
+        forward = lagShift(dfP.int_forward(:,:,1),t,settings.fwdLag);
+        angular = lagShift(dfP.int_angular(:,:,1),t,settings.angLag);
+        sideway = lagShift(dfP.int_sideway(:,:,1),t,settings.sidLag);
         % reshape
         forward = reshape(forward,[],1);
         angular = reshape(angular,[],1);
         sideway = reshape(sideway,[],1);
         % normalize direction and pull IPSI only
-        angular = angular .* normLRD(nf);
-        sideway = sideway .* normLRD(nf);
         angular(angular<0) = nan;
         sideway(sideway<0) = nan;
         % plot 2-3 trials depending on availability
@@ -301,7 +293,7 @@ saveas(gcf,[plotname '.png']);
 % initialize
 figure; set(gcf,'Position',[50 50 3500 900]);
 tiledlayout(3, nFliesD,'TileSpacing','compact')
-sr_lim = [0 10];
+sr_lim = [0 160];
 
 % for each velocity
 for v = 1:3
@@ -345,7 +337,7 @@ saveas(gcf,[plotname '.png']);
 figure; set(gcf,'Position',[50 50 3500 600]);
 tiledlayout(2, nFliesD,'TileSpacing','compact')
 p_range = [0 40; -1.5 1.5];
-sr_lim = [0 18];
+sr_lim = [0 150];
 
 % for each target feature
 for p = 1:2
