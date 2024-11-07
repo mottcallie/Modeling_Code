@@ -24,23 +24,25 @@ runSettings.visObjPosition = linspace(-180, 180, 361);
 
 % Simulation parameters
 runSettings.numRuns = 20000; % Number of times to run the simulation (ideal > 20k)
-runSettings.k = 20;          % Max change in head direction per time step
+runSettings.k = 5;          % Max change in head direction per time step
 runSettings.fs = 100;        % Simulation update rate, in Hz
-runSettings.fpass = 2;       % Lowpass cutoff for random component, in Hz
+runSettings.fpass = 1;       % Lowpass cutoff for random component, in Hz
 
 % Neuron settings
-runSettings.AOTU019_delay = 80; %ms
-runSettings.Others_delay = 100; %ms
+runSettings.AOTU019_delay = 170; %ms
+runSettings.Others_delay = 190; %ms
 runSettings.DNa02_delay = 150; %ms
+
+runSettings.ffscale = 1; %scaling factor for feedforward input
 
 % Open-loop parameters
 runSettings.waveAmp = 35;    % Amplitude of the wave, in degrees
 
 % Downstream process parameters
-runSettings.minIn = -1;      % Minimum input value for downstream process
-runSettings.maxIn = 3.5;     % Maximum input value for downstream process
-runSettings.alpha = 0.075;     % alpha, specifies slope of negative non-linear portion
-runSettings.shift = 0.025;    % shift, determines at what point linear/non-linear portions begin
+runSettings.minIn = -1.25;      % Minimum input value for downstream process
+runSettings.maxIn = 3.75;     % Maximum input value for downstream process
+runSettings.alpha = 0.075;         % alpha, specifies slope of negative non-linear portion
+runSettings.shift = 0.025;       % shift, determines at what point linear/non-linear portions begin
 runSettings.DNa02input = linspace(runSettings.minIn, runSettings.maxIn, 1000); % Input range for DNa02
 runSettings.DNa02output = adjELU(runSettings.DNa02input, runSettings.alpha, runSettings.shift); % Output curve based on ELU nonlinearity
 
@@ -49,8 +51,8 @@ folder.thisFile = matlab.desktop.editor.getActiveFilename;
 [folder.filePath,~,~] = fileparts(folder.thisFile); % Get file path of current script
 folder.trials = [folder.filePath '/trials'];        % Path for storing trial data
 folder.vectors = [folder.filePath '/vectors'];        % Path for storing vectors
-folder.summary = [folder.filePath '/summary'];      % Path for storing summary data
-folder.final = [folder.filePath '/final'];      % Path for storing final data
+folder.settings = [folder.filePath '/settings'];      % Path for storing summary data
+folder.final = [folder.filePath '/summary'];      % Path for storing final data
 
 %% Plot settings
 plotSettings.rfTicks = -180:60:180; % Angle ticks for receptive field plotting (from -180 to 180 degrees)

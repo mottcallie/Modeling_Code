@@ -1,144 +1,134 @@
 % analyzeObjectAndVelocityCrossings
 % Function to analyze zero-crossings in object position and rotational velocity,
-% and bin cross times by object position peaks and rotational velocity peaks.
+% calculate the time delay between when the object crosses zero and when the animal
+% changes directions (indicated by rotational velocity zero-crossing), and bin the 
+% crossing delays by both rotational velocity and instantaneous object velocity.
 %
 % INPUTS:
-%   visobj_history    - Object position history (numRuns x nTime).
-%   rotvel_history    - Rotational velocity history (numRuns x nTime).
-%   timebase          - Time axis for the simulation.
-%   nTest             - Number of trials to run against.
+%   visobj_history       - Matrix of object position history (numRuns x nTime).
+%   rotvel_history       - Matrix of rotational velocity history (numRuns x nTime).
+%   timebase             - Time axis for the simulation, in seconds.
+%   nTest                - Number of trials to analyze, limited by available data.
 %
 % OUTPUTS:
-%   all_rotvel_crosstimes - Times it takes for rotational velocity to cross zero after object crossing.
-%   obj_bins              - Object position bins used for binning cross times.
-%   rotvel_bins           - Rotational velocity bins used for binning cross times.
-%   obj_binned_avgs       - Binned averages of cross times for object position bins.
-%   rotvel_binned_avgs    - Binned averages of cross times for rotational velocity bins.
+%   all_rotvel_crosstimes - Times for rotational velocity to cross zero after each object zero-crossing.
+%   vel_bins              - Bin edges for velocity at crossing
+%   rotvel_binned_avgs    - Binned averages of crossing times within each rotational velocity bin.
+%   visobj_binned_avgs    - Binned averages of crossing times within each object velocity bin.
 %
-function [all_rotvel_crosstimes, obj_bins, rotvel_bins, obj_binned_avgs, rotvel_binned_avgs] = analyzeObjectAndVelocityCrossings(visobj_history, rotvel_history, timebase, nTest)
-    %% Check nTest against the maximum dimension of the input arrays
-    maxRuns = min(size(visobj_history, 1), size(rotvel_history, 1));
-    if nTest > maxRuns
-        nTest = maxRuns;  % Use the maximum available number of runs
-        warning('nTest exceeds the number of available runs. Using maximum dimension: %d', maxRuns);
-    end
+% The function calculates the instantaneous velocity of the object position (`visobj_history`)
+% and bins the time delays of rotational velocity zero-crossings by both the rotational
+% velocity and object velocity at the time of each object position zero-crossing.
+%
+% CREATED: 11/01/2024 - MC
+%
+function [all_rotvel_crosstimes, vel_bins, rotvel_binned_avgs, visobj_binned_avgs] = ...
+    analyzeObjectAndVelocityCrossings(visobj_history, rotvel_history, timebase, nTest)
 
-    %% Initialize output arrays
-   
-    % Define the object and rotational velocity bins
-    obj_bins = -150:20:150;  % Object position bins
-    rotvel_bins = -15:0.5:15;  % Rotational velocity bins
+%% Ensure nTest does not exceed available runs
+maxRuns = min(size(visobj_history, 1), size(rotvel_history, 1));
+if nTest > maxRuns
+    nTest = maxRuns;
+    warning('nTest exceeds the number of available runs. Using maximum dimension: %d', maxRuns);
+end
 
-    % Preallocate for object and rotvel windows
-    window_idx = 15; % Window size in indices
-    time_in_ms = (timebase(1:window_idx*2 + 1) - timebase(window_idx+1)) * 1000;  % Convert to ms around zero-crossing
+% Set bin edges and analysis parameters
+vel_bins = 0:60:440;               % Rotational velocity bins
+window_idx = 20;                      % Size of analysis window around each zero-crossing
+time_in_ms = (timebase(1:window_idx*2 + 1) - timebase(window_idx+1)) * 1000;  % Time array centered at zero-crossing
 
-    %% Analyze direction changes
-    % Initialize arrays
-    all_rotvel_crosstimes = [];
-    all_objpeaks = [];
-    all_rotvelpeaks = [];
+%% Initialize output arrays
+all_rotvel_crosstimes = [];
+all_rotvel_at_cross = [];
+all_visobj_crosstimes = [];
+all_visobj_at_cross = [];
 
-    % Loop through each run
-    for runIdx = 1:nTest
-        this_obj_history = visobj_history(runIdx, :);
-        this_rotvel_history = rotvel_history(runIdx, :);
+% Loop through each trial and analyze zero-crossings
+for runIdx = 1:nTest
+    this_obj_history = visobj_history(runIdx, :);
+    this_rotvel_history = rotvel_history(runIdx, :);
 
-        % Find zero-crossings in object position (where it crosses zero)
-        sign_changes = diff(sign(this_obj_history));
-        zero_cross_indices = find(sign_changes ~= 0);
+    % Calculate instantaneous velocity of visobj
+    visobj_velocity = diff(this_obj_history) ./ diff(timebase);
 
-        for i = 1:length(zero_cross_indices)
-            if i > length(zero_cross_indices), continue; end  % Avoid out-of-bounds error
-            idx = zero_cross_indices(i);
+    % Detect zero-crossings in object position
+    sign_changes = diff(sign(this_obj_history));
+    zero_cross_indices = find(sign_changes ~= 0);
 
-            % Fetch data in the window around the zero-crossing
-            if idx - window_idx < 1 || idx + window_idx > length(this_obj_history)
-                continue; % Skip if window is out of bounds
-            end
-            obj_window = this_obj_history(idx - window_idx : idx + window_idx);
-            rotvel_window = this_rotvel_history(idx - window_idx : idx + window_idx);
+    for i = 1:length(zero_cross_indices)
+        idx = zero_cross_indices(i);
 
-            % Find the first zero-crossing in rotational velocity after the object zero-crossing
-            rotvel_sign_changes = diff(sign(rotvel_window(window_idx+1:end)));
-            first_rotvel_cross_idx = find(rotvel_sign_changes ~= 0, 1, 'first');
+        % Ensure the analysis window is within bounds
+        if idx - window_idx < 1 || idx + window_idx > length(this_obj_history)
+            continue;
+        end
 
-            if ~isempty(first_rotvel_cross_idx)
-                % Find the peak closest to the zero-crossing in object position
-                [obj_peaks, obj_peak_locs] = findpeaks(abs(obj_window(1:window_idx)));  % Find peaks in object position
-                if ~isempty(obj_peaks)
-                    [~, closest_obj_peak_idx] = min(abs(obj_peak_locs - window_idx));  % Closest peak to zero-crossing
-                    obj_peaks = obj_peaks(closest_obj_peak_idx);  % Only store the closest peak
-                end
+        % Extract windows around the zero-crossing in object position
+        rotvel_window = this_rotvel_history(idx - window_idx : idx + window_idx);
 
-                % Find the peak closest to the zero-crossing in rotational velocity
-                [rotvel_peaks, rotvel_peak_locs] = findpeaks(abs(rotvel_window(1:window_idx)));  % Find peaks in rotational velocity
-                if ~isempty(rotvel_peaks)
-                    [~, closest_rotvel_peak_idx] = min(abs(rotvel_peak_locs - window_idx));  % Closest peak to zero-crossing
-                    rotvel_peaks = rotvel_peaks(closest_rotvel_peak_idx);  % Only store the closest peak
-                end
+        % Identify the first rotational velocity zero-crossing after the object zero-crossing
+        rotvel_sign_changes = diff(sign(rotvel_window(window_idx+1:end)));
+        first_rotvel_cross_idx = find(rotvel_sign_changes ~= 0, 1, 'first');
 
-                % Only store if both object and rotational velocity peaks are found and all variables are valid
-                if ~isempty(obj_peaks) && ~isempty(rotvel_peaks) && ~isempty(first_rotvel_cross_idx)
-                    % Time it takes for rotational velocity to cross zero after object crossing
-                    all_rotvel_crosstimes = [all_rotvel_crosstimes, time_in_ms(window_idx+1 + first_rotvel_cross_idx)];
+        % Calculate the delay only if a rotational velocity zero-crossing exists after the object crossing
+        if ~isempty(first_rotvel_cross_idx)
+            time_delay = (first_rotvel_cross_idx + 1) * mean(diff(timebase)) * 1000; % Convert to milliseconds
+            rotvel_at_cross = abs(this_rotvel_history(idx));               % Rotational velocity at crossing
+            all_rotvel_crosstimes = [all_rotvel_crosstimes, time_delay];
+            all_rotvel_at_cross = [all_rotvel_at_cross, rotvel_at_cross];
 
-                    % Store the peaks (combine right and left crossings by taking the absolute value)
-                    all_objpeaks = [all_objpeaks, obj_peaks];
-                    all_rotvelpeaks = [all_rotvelpeaks, rotvel_peaks];
-                end
+            % Fetch the instantaneous velocity of visobj at the crossing
+            if idx < length(visobj_velocity)
+                visobj_at_cross = abs(visobj_velocity(idx));
+                all_visobj_crosstimes = [all_visobj_crosstimes, time_delay];
+                all_visobj_at_cross = [all_visobj_at_cross, visobj_at_cross];
             end
         end
     end
+end
 
-    %% Bin cross times by object and rotational velocity peaks
-    obj_binned_avgs = zeros(1, length(obj_bins)-1);
-    rotvel_binned_avgs = zeros(1, length(rotvel_bins)-1);
-
-    % Bin the object peaks and calculate binned averages for cross times
-    for binIdx = 1:length(obj_bins)-1
-        in_bin = all_objpeaks >= obj_bins(binIdx) & all_objpeaks < obj_bins(binIdx+1);
-        if any(in_bin)
-            obj_binned_avgs(binIdx) = mean(all_rotvel_crosstimes(in_bin), 'omitnan');
-        else
-            obj_binned_avgs(binIdx) = NaN;  % Set to NaN if no values are in the bin
-        end
+% Bin cross times by rotational velocity at the object crossing
+rotvel_binned_avgs = zeros(1, length(vel_bins)-1);
+for binIdx = 1:length(vel_bins)-1
+    in_bin = all_rotvel_at_cross >= vel_bins(binIdx) & all_rotvel_at_cross < vel_bins(binIdx+1);
+    if any(in_bin)
+        rotvel_binned_avgs(binIdx) = mean(all_rotvel_crosstimes(in_bin), 'omitnan');
+    else
+        rotvel_binned_avgs(binIdx) = NaN;
     end
+end
 
-    % Bin the rotational velocity peaks and calculate binned averages for cross times
-    for binIdx = 1:length(rotvel_bins)-1
-        in_bin = all_rotvelpeaks >= rotvel_bins(binIdx) & all_rotvelpeaks < rotvel_bins(binIdx+1);
-        if any(in_bin)
-            rotvel_binned_avgs(binIdx) = mean(all_rotvel_crosstimes(in_bin), 'omitnan');
-        else
-            rotvel_binned_avgs(binIdx) = NaN;  % Set to NaN if no values are in the bin
-        end
+% Bin cross times by visobj velocity at the object crossing
+visobj_binned_avgs = zeros(1, length(vel_bins)-1);
+for binIdx = 1:length(vel_bins)-1
+    in_bin = all_visobj_at_cross >= vel_bins(binIdx) & all_visobj_at_cross < vel_bins(binIdx+1);
+    if any(in_bin)
+        visobj_binned_avgs(binIdx) = mean(all_visobj_crosstimes(in_bin), 'omitnan');
+    else
+        visobj_binned_avgs(binIdx) = NaN;
     end
+end
 
-    %% Skip bins where object max < 10 and rotational velocity max < 5
-    obj_binned_avgs(obj_bins(1:end-1) < 10) = NaN;
-    rotvel_binned_avgs(rotvel_bins(1:end-1) < 5) = NaN;
+%% Optional Plotting of Binned Cross Times
+optPlot = 0;
+if optPlot
+    figure;
+    set(gcf, 'Position', [100 100 600 300]);
 
-    %% Optional Plotting
-    optPlot=0;
-    if optPlot
-        figure;
-        set(gcf, 'Position', [100 100 1200 600]);
+    % Plot binned cross times by rotational velocity bins
+    subplot(1, 2, 1);
+    plot(vel_bins(1:end-1), rotvel_binned_avgs);
+    xlabel('Rotational Velocity at Crossing (deg/s)');
+    ylabel('Avg. Cross Time (ms)');
+    title('Binned Cross Times by Rotational Velocity');
+    grid on;
 
-        % Plot binned cross times by object bins
-        subplot(1, 2, 1);
-        plot(obj_bins(1:end-1), obj_binned_avgs);
-        xlabel('Object Max (deg)');
-        ylabel('Avg. Cross Time (ms)');
-        title('Binned Cross Times by Object Max');
-        grid on;
-
-        % Plot binned cross times by rotational velocity bins
-        subplot(1, 2, 2);
-        plot(rotvel_bins(1:end-1), rotvel_binned_avgs);
-        xlabel('Rotvel Max (deg/s)');
-        ylabel('Avg. Cross Time (ms)');
-        title('Binned Cross Times by Rotvel Max');
-        grid on;
-    end
+    % Plot binned cross times by visobj velocity bins
+    subplot(1, 2, 2);
+    plot(vel_bins(1:end-1), visobj_binned_avgs);
+    xlabel('VisObj Velocity at Crossing (deg/s)');
+    ylabel('Avg. Cross Time (ms)');
+    title('Binned Cross Times by VisObj Velocity');
+    grid on;
+end
 end

@@ -14,7 +14,7 @@ function [posvang, posBins] = analyzeErrorVsTurn(visobj_history, rotvel_history,
     %% Initialize
     % Set bin parameters
     posMax = 180;  % +/- deg
-    posBin = 10;   % deg
+    posBin = 2;   % deg
 
     % Create bins
     posEdge = -posMax - posBin / 2 : posBin : posMax + posBin / 2;  % Bin edges for object position
@@ -26,7 +26,7 @@ function [posvang, posBins] = analyzeErrorVsTurn(visobj_history, rotvel_history,
 
     %% (optional) shift according to lag estimates
     % fetch shift indices for each lag
-    lag_ms = runSettings.DNa02_delay;
+    lag_ms = mean([runSettings.AOTU019_delay,runSettings.Others_delay]);
     lag_idx = round(lag_ms / 1000 * runSettings.fs);
 
     % shift and exclude data at start/stop of trial

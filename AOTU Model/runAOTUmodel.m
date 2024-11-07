@@ -4,17 +4,8 @@
 % to evaluate the impact of varying parameters such as synapse weight, synapse sign (inhibitory vs excitatory),
 % noise levels, open-loop vs closed-loop conditions, and feedforward modulation on steering behavior.
 %
-% The script runs several comparison models using the AOTU019 neuron with different conditions, including:
-% - Alpha values affecting the activation function.
-% - Synapse strength comparison (active vs silenced).
-% - Synapse sign comparison (inhibitory vs excitatory).
-% - Visuomotor delay comparison (fast vs normal).
-% - Feedforward input comparison (with vs without feedforward).
-%
-% Each comparison evaluates the model’s performance across these conditions using preloaded receptive field (RF) data for pursuit behavior.
-% Performance metrics are generated and visualized to analyze how the model reacts under different parameter settings.
-%
 % Created: 10/05/2024 - MC
+% Updated: 11/01/2024 - MC
 %
 %% Initialize workspace and variables
 % Clear all variables and close any open figures to ensure a clean workspace
@@ -22,7 +13,6 @@ clear
 close all
 
 % Initialize folder paths, plot settings, and run-specific parameters by calling the modelSettings function.
-% This sets up essential configurations needed for the simulations.
 [folder, plotSettings, runSettings] = modelSettings();
 
 % Change the directory to the script's file path to access data files.
@@ -36,26 +26,16 @@ load("Pursuit_RFs.mat");
 % These predicted RFs will be used in subsequent model performance comparisons.
 predicted_RF = processRFdata(Pursuit_RFs);
 
-%% Compare model performance across different alpha values
-% This section runs model performance comparisons across a range of alpha values, which modify the activation function.
-% Alpha values control the non-linear portion of the DNa02 neuron output, affecting the model's response to visual input.
+%% Calibrate alpha parameter
+modelCalibration(predicted_RF)
 
-% Define the alpha values to test in the model simulations.
-alpha = [0.1, 0.25, 0.5, 0.8, 1]; 
-nAlpha = length(alpha);  % Calculate the number of alpha values to iterate over.
+% Plot RFs and ELU for reference
+plotModelSettings(predicted_RF, runSettings)
 
-% Loop over each alpha value and run the model performance comparison.
-for aIdx = 1:nAlpha
-    thisAlpha = alpha(aIdx);  % Current alpha value for the iteration
-    disp(['   Preparing batch for alpha = ' num2str(thisAlpha)])  % Display progress in the command window.
-    
-    % Call 'compareModelPerformance' to evaluate model performance for the current alpha value.
-    % This function generates performance metrics based on the steering behavior of the model with the specified alpha.
-    compareModelPerformance(thisAlpha, predicted_RF)
-end
-
-% Close all open figures to avoid memory issues and overlapping visualizations.
-close all
+% Save the plot
+saveas(gcf, fullfile(folder.settings, ['Model_Settings' '.png']));
+set(gcf,'renderer','Painters')
+saveas(gcf, fullfile(folder.vectors, ['Model_Settings' '.svg']));
 
 %% Run AOTU019 active vs silenced comparison model
 % Compare model performance when AOTU019 is fully active vs silenced (strength = 1 vs strength = 0).
@@ -76,7 +56,7 @@ modelPerformance(predicted_RF, 'speed');  % Specify 'speed' as the comparison ty
 close all  % Close all open figures after the comparison is complete.
 
 %% Run AOTU019 with vs without feedforward input comparison model
-% Compare model performance with and without feedforward modulation from the AOTU019 neuron.
+% Compare modrel performance with and without feedforward modulation from the AOTU019 neuron.
 % This comparison evaluates the influence of feedforward input on the fly's ability to maintain stable pursuit behavior.
-modelPerformanceFeedforwardComparison(predicted_RF);  % Call the feedforward comparison function.
+modelPerformance(predicted_RF, 'feedforward')
 close all  % Close all open figures after the comparison is complete.
